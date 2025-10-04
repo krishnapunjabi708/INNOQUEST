@@ -258,3 +258,94 @@ def get_npk_for_region(comp, region):
     except Exception as e:
         logging.error(f"Error in get_npk_for_region: {e}")
         return None, None, None
+def calculate_soil_health_score(params):
+    score = 0
+    total_params = len(params)
+    for param, value in params.items():
+        if value is None:
+            total_params -= 1
+            continue
+        if param == "Soil Texture":
+            if value == IDEAL_RANGES[param]:
+                score += 1
+        else:
+            min_val, max_val = IDEAL_RANGES.get(param, (None, None))
+            if min_val is None and max_val is not None:
+                if value <= max_val:
+                    score += 1
+            elif max_val is None and min_val is not None:
+                if value >= min_val:
+                    score += 1
+            elif min_val is not None and max_val is not None:
+                if min_val <= value <= max_val:
+                    score += 1
+    percentage = (score / total_params) * 100 if total_params > 0 else 0
+    rating = "Excellent" if percentage >= 80 else "Good" if percentage >= 60 else "Fair" if percentage >= 40 else "Poor"
+    return percentage, rating
+
+def generate_interpretation(param, value):
+    if value is None:
+        return "Data unavailable."
+    if param == "Soil Texture":
+        return TEXTURE_CLASSES.get(value, "Unknown texture.")
+    if param == "NDWI":
+        if value >= -0.10:
+            return "Good moisture; no irrigation needed."
+        elif -0.30 <= value < -0.15:
+            return "Mild stress; light irrigation soon."
+        elif -0.40 <= value < -0.30:
+            return "Moderate stress; irrigate in 1–2 days."
+        else:
+            return "Severe stress; irrigate immediately."
+    min_val, max_val = IDEAL_RANGES.get(param, (None, None))
+    if min_val is None and max_val is not None:
+        return f"Optimal (≤{max_val})." if value <= max_val else f"High (>{max_val})."
+    elif max_val is None and min_val is not None:
+        return f"Optimal (≥{min_val})." if value >= min_val else f"Low (<{min_val})."
+    else:
+        range_text = f"{min_val}-{max_val}" if min_val and max_val else "N/A"
+        if min_val is not None and max_val is not None and min_val <= value <= max_val:
+            return f"Optimal ({range_text})."
+        elif min_val is not None and value < min_val:
+            return f"Low (<{min_val})."
+        elif max_val is not None and value > max_val:
+            return f"High (>{max_val})."
+        return f"No interpretation for {param}."
+
+
+def get_color_for_value(param, value):
+    if value is None:
+        return 'grey'
+    if param == "Soil Texture":
+        return 'green' if value == IDEAL_RANGES[param] else 'red'
+    min_val, max_val = IDEAL_RANGES.get(param, (None, None))
+    if min_val is None and max_val is not None:
+        if value <= max_val:
+            return 'green'
+        elif value <= max_val * 1.2:
+            return 'yellow'
+        else:
+            return 'red'
+    elif max_val is None and min_val is not None:
+        if value >= min_val:
+            return 'green'
+        elif value >= min_val * 0.8:
+            return 'yellow'
+        else:
+            return 'red'
+    elif min_val is not None and max_val is not None:
+        if min_val <= value <= max_val:
+            return 'green'
+        elif value < min_val:
+            if value >= min_val * 0.8:
+                return 'yellow'
+            else:
+                return 'red'
+        elif value > max_val:
+            if param in ["Phosphorus", "Potassium"] and value <= max_val * 1.5:
+                return 'yellow'
+            elif value <= max_val * 1.2:
+                return 'yellow'
+            else:
+                return 'red'
+    return 'blue'
