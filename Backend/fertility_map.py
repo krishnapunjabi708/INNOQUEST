@@ -231,6 +231,50 @@ if selected_boundary:
         _region = ee.Geometry.Polygon(selected_boundary["geometry"]["coordinates"])
         with st.spinner("Processing composite images..."):
             df, used_collection, required_bands = compute_indices(_region, start_date, end_date, comp_days)
+
+    
+
+        ndvi_latest = 2
+        param_choice = st.selectbox("Select Overlay:", ("NDVI", "NDWI", "Fertility"))
+        if param_choice == "NDVI":
+            vis_params = {'min': 0, 'max': 1, 'palette': ['#f7fcf5','#e5f5e0','#c7e9c0','#74c476','#238b45']}
+            param_image = ndvi_latest
+            description = "**NDVI Overlay:** White indicates low vegetation; dark green indicates high vegetation."
+        elif param_choice == "NDWI":
+            vis_params = {'min': -1, 'max': 1, 'palette': ['#f7fbff','#deebf7','#c6dbef','#9ecae1','#6baed6','#3182bd']}
+            
+            description = "**NDWI Overlay:** Light blue indicates low moisture; dark blue indicates high moisture."
+        else:
+            # Fertility overlay: red indicates low fertility, yellow moderate, green high fertility.
+            vis_params = {'min': -1, 'max': 1, 'palette': ['#d73027','#f46d43','#fee08b','#a6d96a','#1a9850']}
+            
+            description = "**Fertility Overlay:** Red areas require more fertilizer; green areas require little or none."
+            
+        st.write(description)
+        map_id_dict = ee.Image(param_image).getMapId(vis_params)
+        
+        m_param = folium.Map(location=st.session_state.user_location, zoom_start=15)
+        folium.TileLayer(tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google", name="Satellite").add_to(m_param)
+        folium.GeoJson(data=_region.getInfo(), name="Selected Field").add_to(m_param)
+        # Add overlay from Earth Engine.
+        folium.TileLayer(
+            tiles=map_id_dict['tile_fetcher'].url_format,
+            attr="Google Earth Engine",
+            name=param_choice,
+            overlay=True,
+            control=True
+        ).add_to(m_param)
+        # Mark the farmer's current real-time location on the fertility map.
+        folium.Marker(
+            st.session_state.user_location,
+            popup="Farmer's Current Location",
+            tooltip="You are here",
+            icon=folium.Icon(color="blue", icon="user", prefix="fa")
+        ).add_to(m_param)
+        folium.LayerControl().add_to(m_param)
+        
+        st_folium(m_param, width=700, height=500)
+
     except Exception as e:
         st.error(f"⚠ Error: {str(e)}")
         st.write("Select a different region or check your internet connection.")
