@@ -53,7 +53,7 @@ import 'package:flutter/material.dart';
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 32),
                               child: Text(
-                                'Welcome to FarmMatrix',
+                                'Welcome to FarmMatrix - Your Smart Farming Solution',
                                 textAlign: TextAlign.center,
                                 style: AppConfig.headingStyle,
                               ),
