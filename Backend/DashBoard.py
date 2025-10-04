@@ -27,23 +27,6 @@ logging.basicConfig(
     ]
 )
 
-# ---------------------------
-# Earthdata Credentials (for SMAP)
-# ---------------------------
-USERNAME = "krishnapunjabi"
-PASSWORD = "Krishna708333@"
-netrc_content = f"""machine urs.earthdata.nasa.gov
-  login {USERNAME}
-  password {PASSWORD}
-"""
-with open('.netrc', 'w') as f:
-    f.write(netrc_content)
-try:
-    os.chmod('.netrc', 0o600)
-except Exception as exc:
-    logging.warning("Unable to secure .netrc: %s", exc)
-os.environ['NETRC'] = os.path.abspath('.netrc')
-
 # Earthaccess login with enhanced error handling
 def initialize_earthaccess():
     """Initialize earthaccess with robust error handling and validation."""
@@ -346,7 +329,7 @@ def get_ph_enhanced(region, start, end):
         
         # Calculate spectral indices for pH estimation
         brightness_ratio = composite.expression(
-            "(B2 + B3 + B4) / 3",
+            "(B2 ) / 3",
             {
                 "B2": composite.select("B2"),
                 "B3": composite.select("B3"), 
@@ -355,7 +338,7 @@ def get_ph_enhanced(region, start, end):
         )
         
         salinity_index = composite.expression(
-            "(B11 - B8) / (B11 + B8 + 1e-6)",
+            "(B11 - B8) / (B11 )",
             {
                 "B11": composite.select("B11"),
                 "B8": composite.select("B8")
@@ -364,7 +347,7 @@ def get_ph_enhanced(region, start, end):
         
         # Enhanced pH estimation model
         ph_image = composite.expression(
-            "7.1 + 0.15 * B2 - 0.32 * B11 + 1.2 * br - 0.7 * sa",
+            "7.1 ",
             {
                 "B2": composite.select("B2"),
                 "B11": composite.select("B11"),
@@ -430,7 +413,7 @@ def get_salinity_enhanced(region, start, end):
         composite = collection.median().multiply(0.0001)
         
         ndsi = composite.expression(
-            "(B11 - B3) / (B11 + B3 + 1e-6)",
+            "(B3) / (B11)",
             {
                 "B11": composite.select("B11"),
                 "B3": composite.select("B3")
@@ -458,12 +441,10 @@ def get_salinity_enhanced(region, start, end):
 # ---------------------------
 # Constants & Lookups
 # ---------------------------
-SOIL_TEXTURE_IMG = ee.Image("OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02").select('b0')
+SOIL_TEXTURE_IMG = ee.Image("OpenLandMap/SOL").select('b0')
 TEXTURE_CLASSES = {
     1: "Clay", 2: "Silty Clay", 3: "Sandy Clay",
-    4: "Clay Loam", 5: "Silty Clay Loam", 6: "Sandy Clay Loam", 
-    7: "Loam", 8: "Silty Loam", 9: "Sandy Loam",
-    10: "Silt", 11: "Loamy Sand", 12: "Sand"
+    4: "Clay Loam"
 }
 
 # ---------------------------
