@@ -442,6 +442,160 @@ def make_soil_properties_chart(ph, sal, oc, cec, lst):
         return None
 
 
+def generate_report(params, location, date_range):
+    try:
+        score, rating = calculate_soil_health_score(params)
+        interpretations = {param: generate_interpretation(param, value) for param, value in params.items()}
+        
+        nutrient_chart = make_nutrient_chart(params["Nitrogen"], params["Phosphorus"], params["Potassium"])
+        vegetation_chart = make_vegetation_chart(params["NDVI"], params["EVI"], params["FVC"], params["NDWI"])  # Fixed line
+        properties_chart = make_soil_properties_chart(params["pH"], params["Salinity"], params["Organic Carbon"], params["CEC"], params["LST"])
+
+        genai_configured = False
+        try:
+            genai.configure(api_key=API_KEY)
+            model = genai.GenerativeModel(MODEL)
+            response = model.generate_content("Test: Generate a one-sentence summary.")
+            if response and response.text:
+                genai_configured = True
+                logging.info("Gemini API configured successfully.")
+        except Exception as e:
+            logging.error(f"Failed to configure Gemini API: {e}")
+
+        if genai_configured:
+            try:
+                prompt = f"""
+                Generate a simple executive summary for a soil health report as a bullet-point list (3–5 short points) for farmers, including:
+                - Location: {location}
+                - Date Range: {date_range}
+                - Soil Health Score: {score:.1f}% ({rating})
+                - Parameters: pH={params['pH'] or 'N/A'}, Salinity={params['Salinity'] or 'N/A'}, Organic Carbon={params['Organic Carbon']*100 if params['Organic Carbon'] else 'N/A'}%, CEC={params['CEC'] or 'N/A'}, Soil Texture={TEXTURE_CLASSES.get(params['Soil Texture'], 'N/A')}, N={params['Nitrogen'] or 'N/A'}, P={params['Phosphorus'] or 'N/A'}, K={params['Potassium'] or 'N/A'}
+                Focus on key findings and urgent issues in clear, farmer-friendly language.
+                Use bullet points starting with "•" and avoid bold or markdown formatting like ** or *.
+                """
+                response = model.generate_content(prompt)
+                executive_summary = response.text if response and response.text else "• Summary unavailable."
+
+                prompt_recommendations = f"""
+                Provide crop and soil treatment recommendations as a bullet-point list (3–5 short points) for farmers, based on:
+                - pH: {params['pH'] or 'N/A'}
+                - Salinity: {params['Salinity'] or 'N/A'}
+                - Organic Carbon: {params['Organic Carbon']*100 if params['Organic Carbon'] else 'N/A'}%
+                - CEC: {params['CEC'] or 'N/A'}
+                - Soil Texture: {TEXTURE_CLASSES.get(params['Soil Texture'], 'N/A')}
+                - Nitrogen: {params['Nitrogen'] or 'N/A'} mg/kg
+                - Phosphorus: {params['Phosphorus'] or 'N/A'} mg/kg
+                - Potassium: {params['Potassium'] or 'N/A'} mg/kg
+                - NDVI: {params['NDVI'] or 'N/A'}
+                - EVI: {params['EVI'] or 'N/A'}
+                - FVC: {params['FVC'] or 'N/A'}
+                Suggest suitable crops and simple soil treatments in clear, farmer-friendly language.
+                Use bullet points starting with "•" and avoid bold or markdown formatting like ** or *.
+                """
+                response = model.generate_content(prompt_recommendations)
+                recommendations = response.text if response and response.text else "• Recommendations unavailable."
+            except Exception as e:
+                logging.error(f"Gemini API error: {e}")
+                executive_summary = "• Summary unavailable due to API error."
+                recommendations = "• Recommendations unavailable due to API error."
+        else:
+            executive_summary = "• Summary unavailable; Gemini API not configured."
+            recommendations = "• Recommendations unavailable; Gemini API not configured."
+
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=3*cm, bottomMargin=2*cm)
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle('Title', parent=styles['Title'], fontSize=16, spaceAfter=12, alignment=TA_CENTER)
+        h2 = ParagraphStyle('Heading2', parent=styles['Heading2'], fontSize=12, spaceAfter=10)
+        body = ParagraphStyle('Body', parent=styles['BodyText'], fontSize=10, leading=12)
+
+        elements = []
+        if os.path.exists(LOGO_PATH):
+            elements.append(Image(LOGO_PATH, width=6*cm, height=6*cm))
+        elements.append(Paragraph("FarmMatrix Soil Health Report", title_style))
+        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Paragraph(f"<b>Location:</b> {location}", body))
+        elements.append(Paragraph(f"<b>Date Range:</b> {date_range}", body))
+        elements.append(Paragraph(f"<b>Generated on:</b> {datetime.now():%B %d, %Y %H:%M}", body))
+        elements.append(PageBreak())
+
+        elements.append(Paragraph("1. Executive Summary", h2))
+        for line in executive_summary.split('\n'):
+            elements.append(Paragraph(line.strip(), body))
+        elements.append(Spacer(1, 0.5*cm))
+
+        elements.append(Paragraph("2. Soil Parameter Analysis", h2))
+        table_data = [["Parameter", "Value", "Ideal Range", "Interpretation"]]
+        for param, value in params.items():
+            if param == "Soil Texture":
+                value_text = TEXTURE_CLASSES.get(value, 'N/A')
+                ideal = "Loam" if value == 7 else "Non-ideal"
+            else:
+                value_text = f"{value:.2f}" if value is not None else "N/A"
+                min_val, max_val = IDEAL_RANGES.get(param, (None, None))
+                ideal = f"{min_val}-{max_val}" if min_val and max_val else f"≤{max_val}" if max_val else f"≥{min_val}" if min_val else "N/A"
+            interpretation = interpretations[param]
+            table_data.append([param, value_text, ideal, Paragraph(interpretation, body)])
+        tbl = Table(table_data, colWidths=[3*cm, 3*cm, 4*cm, 6*cm])
+        tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('FONTSIZE', (0,0), (-1,-1), 10),
+            ('BOX', (0,0), (-1,-1), 1, colors.black)
+        ]))
+        elements.append(tbl)
+        elements.append(Spacer(1, 0.5*cm))
+        elements.append(PageBreak())
+        elements.append(Paragraph("3. Visualizations", h2))
+        for chart, path in [("Nutrient Levels", nutrient_chart), ("Vegetation Indices", vegetation_chart), ("Soil Properties", properties_chart)]:
+            if path:
+                elements.append(Paragraph(f"{chart}:", body))
+                elements.append(Image(path, width=12*cm, height=6*cm))
+                elements.append(Spacer(1, 0.2*cm))
+        elements.append(Spacer(1, 0.5*cm))
+        elements.append(PageBreak())
+        elements.append(Paragraph("4. Crop Recommendations & Treatments", h2))
+        for line in recommendations.split('\n'):
+            elements.append(Paragraph(line.strip(), body))
+        elements.append(Spacer(1, 0.5*cm))
+
+        elements.append(Paragraph("5. Soil Health Rating", h2))
+        elements.append(Paragraph(f"Overall Rating: <b>{rating} ({score:.1f}%)</b>", body))
+        rating_desc = f"The soil health score shows how many parameters are ideal, indicating {rating.lower()} conditions."
+        elements.append(Paragraph(rating_desc, body))
+
+        def add_header(canvas, doc):
+            canvas.saveState()
+            if os.path.exists(LOGO_PATH):
+                canvas.drawImage(LOGO_PATH, 2*cm, A4[1] - 3*cm, width=2*cm, height=2*cm)
+            canvas.setFont("Helvetica-Bold", 12)
+            canvas.drawString(5*cm, A4[1] - 2.5*cm, "FarmMatrix Soil Health Report")
+            canvas.setFont("Helvetica", 8)
+            canvas.drawRightString(A4[0] - 2*cm, A4[1] - 2.5*cm, f"Generated: {datetime.now():%B %d, %Y %H:%M}")
+            canvas.restoreState()
+
+        def add_footer(canvas, doc):
+            canvas.saveState()
+            canvas.setFont("Helvetica", 8)
+            canvas.drawCentredString(A4[0]/2, cm, f"Page {doc.page}")
+            canvas.restoreState()
+
+        doc.build(elements, onFirstPage=add_header, onLaterPages=add_header, canvasmaker=canvas.Canvas)
+        pdf_buffer.seek(0)
+        return pdf_buffer.getvalue()
+    except Exception as e:
+        logging.error(f"Error in generate_report: {e}")
+        return None
+
+# Streamlit UI
+st.set_page_config(layout='wide', page_title="Soil Health Dashboard")
+st.title("🌾 Soil Health Dashboard")
+st.markdown("Analyze soil health using satellite data and download a detailed report.")
+
+# Sidebar Inputs
 st.sidebar.header("📍 Location & Parameters")
 if 'user_location' not in st.session_state:
     st.session_state.user_location = [18.4575, 73.8503]  # Default: Pune, IN
