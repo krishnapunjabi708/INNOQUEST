@@ -1,3 +1,4 @@
+import 'package:farmmatrix/screens/language_selection/language_selection_screen.dart';
 import 'package:flutter/material.dart';
     import 'package:farmmatrix/config/app_config.dart';
     import 'package:farmmatrix/screens/splash/welcome_screen.dart';
@@ -26,6 +27,9 @@ import 'package:flutter/material.dart';
             ),
           ),
           home: const WelcomeScreen(),
+          routes: {
+            '/language': (context) => const LanguageSelectionScreen(),
+          },
         );
       }
     }

@@ -68,7 +68,7 @@ import 'package:flutter/material.dart';
                         child: PrimaryButton(
                           text: 'Get Started',
                           onPressed: () {
-                            // Placeholder for navigation
+                            Navigator.pushNamed(context, '/language');
                           },
                         ),
                       ),
