@@ -1,3 +1,4 @@
+import 'package:farmmatrix/screens/auth/login_screen.dart';
 import 'package:flutter/material.dart';
     import 'package:farmmatrix/config/app_config.dart';
     import 'package:farmmatrix/widgets/common_widgets.dart';
@@ -93,15 +94,3 @@ import 'package:flutter/material.dart';
       }
     }
 
-    // Placeholder LoginScreen until implemented
-    class LoginScreen extends StatelessWidget {
-      const LoginScreen({super.key});
-
-      @override
-      Widget build(BuildContext context) {
-        return Scaffold(
-          appBar: AppBar(title: const Text('Login')),
-          body: const Center(child: Text('Login Screen Placeholder')),
-        );
-      }
-    }
