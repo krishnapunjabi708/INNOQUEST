@@ -349,3 +349,201 @@ def get_color_for_value(param, value):
             else:
                 return 'red'
     return 'blue'
+
+def make_nutrient_chart(n_val, p_val, k_val):
+    try:
+        nutrients = ["Nitrogen", "Phosphorus", "Potassium"]
+        values = [n_val or 0, p_val or 0, k_val or 0]
+        colors = [get_color_for_value(nutrient, value) for nutrient, value in zip(nutrients, values)]
+        plt.figure(figsize=(6, 4))
+        bars = plt.bar(nutrients, values, color=colors, alpha=0.7)
+        plt.title("Soil Nutrient Levels (mg/kg)", fontsize=12)
+        plt.ylabel("Concentration (mg/kg)")
+        plt.ylim(0, max(values) * 1.2 if any(values) else 500)
+        for bar, value in zip(bars, values):
+            yval = bar.get_height()
+            status = 'Good' if colors[bars.index(bar)] == 'green' else 'High' if value > IDEAL_RANGES[nutrients[bars.index(bar)]][1] else 'Low'
+            plt.text(bar.get_x() + bar.get_width()/2, yval + 5, f"{yval:.1f}\n{status}", ha='center', va='bottom')
+        plt.tight_layout()
+        chart_path = "nutrient_chart.png"
+        plt.savefig(chart_path, dpi=100, bbox_inches='tight')
+        plt.close()
+        return chart_path
+    except Exception as e:
+        logging.error(f"Error in make_nutrient_chart: {e}")
+        return None
+
+def make_vegetation_chart(ndvi, evi, fvc, *args):
+    """
+    Plots NDVI, EVI, FVC bars and annotates their status.
+    Extra positional args are ignored.
+    """
+    try:
+        indices = ["NDVI", "EVI", "FVC"]
+        values = [ndvi or 0, evi or 0, fvc or 0]
+        colors = [get_color_for_value(idx, val) for idx, val in zip(indices, values)]
+
+        plt.figure(figsize=(6, 4))
+        bars = plt.bar(indices, values, color=colors, alpha=0.7)
+        plt.title("Vegetation and Moisture Indices", fontsize=12)
+        plt.ylabel("Value")
+        plt.ylim(0, 1)
+
+        for i, (bar, val) in enumerate(zip(bars, values)):
+            y = bar.get_height()
+            low, high = IDEAL_RANGES.get(indices[i], (0, 1))
+            if val > high:
+                status = "High"
+            elif val < low:
+                status = "Low"
+            else:
+                status = "Good"
+            plt.text(
+                bar.get_x() + bar.get_width()/2,
+                y + 0.02,
+                f"{y:.2f}\n{status}",
+                ha="center",
+                va="bottom"
+            )
+
+        plt.tight_layout()
+        path = "vegetation_chart.png"
+        plt.savefig(path, dpi=100, bbox_inches="tight")
+        plt.close()
+        return path
+
+    except Exception as e:
+        logging.error(f"Error in make_vegetation_chart: {e}")
+        return None
+
+
+def make_soil_properties_chart(ph, sal, oc, cec, lst):
+    try:
+        properties = ["pH", "Salinity", "Org. Carbon (%)", "CEC", "LST"]
+        values = [ph or 0, sal or 0, (oc * 100 if oc else 0), cec or 0, lst or 0]
+        colors = [get_color_for_value(prop, value) for prop, value in zip(["pH", "Salinity", "Organic Carbon", "CEC", "LST"], values)]
+        plt.figure(figsize=(8, 4))
+        bars = plt.bar(properties, values, color=colors, alpha=0.7)
+       
+        plt.title("Soil Properties", fontsize=12)
+        plt.ylabel("Value")
+        plt.ylim(0, max(values) * 1.2 if any(values) else 50)
+        for bar, value, prop in zip(bars, values, ["pH", "Salinity", "Organic Carbon", "CEC", "LST"]):
+            yval = bar.get_height()
+            status = 'Good' if colors[bars.index(bar)] == 'green' else 'High' if (prop == "Salinity" and value > IDEAL_RANGES[prop][1]) or (prop != "Salinity" and value > IDEAL_RANGES[prop][1]) else 'Low'
+            plt.text(bar.get_x() + bar.get_width()/2, yval + max(values) * 0.05, f"{yval:.2f}\n{status}", ha='center', va='bottom')
+        plt.tight_layout()
+        chart_path = "properties_chart.png"
+        plt.savefig(chart_path, dpi=100, bbox_inches='tight')
+        plt.close()
+        return chart_path
+    except Exception as e:
+        logging.error(f"Error in make_soil_properties_chart: {e}")
+        return None
+
+
+st.sidebar.header("📍 Location & Parameters")
+if 'user_location' not in st.session_state:
+    st.session_state.user_location = [18.4575, 73.8503]  # Default: Pune, IN
+lat = st.sidebar.number_input("Latitude", value=st.session_state.user_location[0], format="%.6f")
+lon = st.sidebar.number_input("Longitude", value=st.session_state.user_location[1], format="%.6f")
+st.session_state.user_location = [lat, lon]
+
+st.sidebar.header("🧪 CEC Model Coefficients")
+cec_intercept = st.sidebar.number_input("Intercept", value=5.0, step=0.1)
+cec_slope_clay = st.sidebar.number_input("Slope (Clay Index)", value=20.0, step=0.1)
+cec_slope_om = st.sidebar.number_input("Slope (OM Index)", value=15.0, step=0.1)
+
+today = date.today()
+start_date = st.sidebar.date_input("Start Date", value=today - timedelta(days=16))
+end_date = st.sidebar.date_input("End Date", value=today)
+if start_date > end_date:
+    st.sidebar.error("Start date must be before end date.")
+    st.stop()
+
+# Map
+m = folium.Map(location=[lat, lon], zoom_start=15)
+Draw(export=True).add_to(m)
+folium.TileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google").add_to(m)
+folium.Marker([lat, lon], popup="Center").add_to(m)
+map_data = st_folium(m, width=700, height=500)
+
+# Process Region
+region = None
+if map_data and "last_active_drawing" in map_data:
+    try:
+        sel = map_data["last_active_drawing"]
+        if sel and "geometry" in sel and "coordinates" in sel["geometry"]:
+            region = ee.Geometry.Polygon(sel["geometry"]["coordinates"])
+        else:
+            st.error("Invalid region selected. Draw a valid polygon.")
+    except Exception as e:
+        st.error(f"Error creating region: {e}")
+
+if region:
+    st.subheader(f"Results: {start_date} to {end_date}")
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    status_text.text("Fetching Sentinel-2 data…")
+    all_bands = ["B2", "B3", "B4", "B8", "B11", "B12"]
+    comp = sentinel_composite(region, start_date, end_date, all_bands)
+    progress_bar.progress(20)
+
+    status_text.text("Calculating soil texture…")
+    texc = get_soil_texture(region)
+    progress_bar.progress(40)
+
+    status_text.text("Fetching LST data…")
+    lst = get_lst(region, start_date, end_date)
+    progress_bar.progress(60)
+
+    if comp is None:
+        st.warning("No Sentinel-2 data available for the selected period.")
+        ph = sal = oc = cec = ndwi = ndvi = evi = fvc = n_val = p_val = k_val = None
+    else:
+        status_text.text("Computing soil parameters…")
+        ph = get_ph(comp, region)
+        sal = get_salinity(comp, region)
+        oc = get_organic_carbon(comp, region)
+        cec = estimate_cec(comp, region, cec_intercept, cec_slope_clay, cec_slope_om)
+        ndwi = get_ndwi(comp, region)
+        ndvi = get_ndvi(comp, region)
+        evi = get_evi(comp, region)
+        fvc = get_fvc(comp, region)
+        n_val, p_val, k_val = get_npk_for_region(comp, region)
+        progress_bar.progress(100)
+        status_text.text("Parameters computed successfully.")
+
+    params = {
+        "pH": ph,
+        "Salinity": sal,
+        "Organic Carbon": oc,
+        "CEC": cec,
+        "Soil Texture": texc,
+        "LST": lst,
+        "NDWI": ndwi,
+        "NDVI": ndvi,
+        "EVI": evi,
+        "FVC": fvc,
+        "Nitrogen": n_val,
+        "Phosphorus": p_val,
+        "Potassium": k_val
+    }
+
+    if st.button("Generate Soil Report"):
+        with st.spinner("Generating report…"):
+            location = f"Lat: {lat:.6f}, Lon: {lon:.6f}"
+            date_range = f"{start_date} to {end_date}"
+            pdf_data = generate_report(params, location, date_range)
+            if pdf_data:
+                st.download_button(
+                    label="Download Report",
+                    data=pdf_data,
+                    file_name="soil_health_report.pdf",
+                    mime="application/pdf"
+                )
+            else:
+                st.error("Failed to generate report. Check logs for details.")
+else:
+    st.info("Draw a polygon on the map to select a region.")
