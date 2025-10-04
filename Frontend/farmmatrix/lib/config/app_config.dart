@@ -4,8 +4,18 @@ import 'package:flutter/material.dart';
       // App Colors
       static const Color primaryColor = Color(0xFF1B413C);
       static const Color textColor = Color(0xFF333333);
-      static const Color accentColor = Color(0xFFDB9F75);
       static const Color backgroundColor = Colors.white;
+      static const Color accentColor = Color(0xFFDB9F75);
+
+      // Gradient for Login Screen
+      static const LinearGradient authGradient = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFF13251F),
+          Color(0xFF1B413C),
+        ],
+      );
 
       // Text Styles
       static const String fontFamily = 'PlusJakartaSans';
