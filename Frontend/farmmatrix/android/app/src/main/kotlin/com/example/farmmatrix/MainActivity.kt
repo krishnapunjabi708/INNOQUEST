@@ -1,4 +1,4 @@
-package com.example.farmmatrix
+package com.example.innoquest
 
 import io.flutter.embedding.android.FlutterActivity
 
