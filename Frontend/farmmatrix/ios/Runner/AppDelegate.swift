@@ -8,7 +8,7 @@ import UIKit
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
-    GMSServices.provideAPIKey("AIzaSyCKNos9aiQ_tMfSrRD-FaSkZnC7gWOHeLY")
+    GMSServices.provideAPIKey("YOUR_GOOGLE_API_KEY")
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }
