@@ -1,3 +1,5 @@
+import 'package:farmmatrix/screens/home/home_screen.dart';
+import 'package:farmmatrix/services/auth_services.dart';
 import 'package:flutter/material.dart';
     import 'package:farmmatrix/config/app_config.dart';
     import 'package:farmmatrix/widgets/common_widgets.dart';
@@ -341,28 +343,3 @@ import 'package:flutter/material.dart';
       }
     }
 
-    // Placeholder HomeScreen until implemented
-    class HomeScreen extends StatelessWidget {
-      const HomeScreen({super.key});
-
-      @override
-      Widget build(BuildContext context) {
-        return Scaffold(
-          appBar: AppBar(title: const Text('Home')),
-          body: const Center(child: Text('Home Screen Placeholder')),
-        );
-      }
-    }
-
-    // Placeholder AuthServices until implemented
-    class AuthServices {
-      static Future<String?> createUser({
-        required String phone,
-        required String fullName,
-        required double latitude,
-        required double longitude,
-      }) async {
-        // Placeholder: Simulate user creation
-        return 'user_${phone}_$fullName';
-      }
-    }
