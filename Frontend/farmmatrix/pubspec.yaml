@@ -39,6 +39,8 @@ dependencies:
   geocoding: ^3.0.0
   shared_preferences: ^2.5.3
   country_code_picker: ^3.3.0
+  http: ^1.2.2
+  google_maps_flutter: ^2.9.0
 
 
 dev_dependencies:

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:farmmatrix/models/user_model.dart';
+import 'package:farmmatrix/screens/field_add_selection/add_field_screen.dart';
 import 'package:farmmatrix/services/user_service.dart';
 import 'package:flutter/material.dart';
 import 'package:farmmatrix/config/app_config.dart';
@@ -273,7 +274,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        // Placeholder for adding new field
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AddFieldScreen(),
+                          ),
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppConfig.primaryColor,
