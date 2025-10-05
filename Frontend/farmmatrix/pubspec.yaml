@@ -35,6 +35,11 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   supabase_flutter: ^2.8.4
+  geolocator: ^13.0.2
+  geocoding: ^3.0.0
+  shared_preferences: ^2.5.3
+  country_code_picker: ^3.3.0
+
 
 dev_dependencies:
   flutter_test:
